@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="nsiBlue">#0454a4</color>
+    <color name="nsiBlueLight">#6898C8</color>
+    <color name="nsiRed">#f61c1f</color>
+    <color name="nsiRedLight">#FEE8E9</color>
+    <color name="bgSurface">#FFFFFF</color>
+
+    <!-- Material primary -->
+    <color name="md_theme_light_primary">#009688</color>
+    <color name="md_theme_light_onPrimary">#FFFFFF</color>
+</resources>
