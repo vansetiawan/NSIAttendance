@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:padding="16dp"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+
+    <TextView
+        android:id="@+id/tvNotice"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Menampilkan 30 hari terakhir"
+        android:textStyle="bold" android:paddingBottom="8dp"/>
+
+    <ListView
+        android:id="@+id/lvDays"
+        android:layout_width="match_parent" android:layout_height="260dp"
+        android:divider="@android:color/darker_gray" android:dividerHeight="0.5dp"
+        android:listSelector="@android:color/transparent"/>
+
+    <TextView
+        android:id="@+id/tvEmptyDays"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Belum ada data dalam 30 hari terakhir"
+        android:gravity="center" android:padding="12dp"
+        android:visibility="gone"/>
+
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="end"
+        android:paddingTop="8dp">
+        <Button
+            android:id="@+id/btnMore"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Muat lagi"/>
+    </LinearLayout>
+</LinearLayout>

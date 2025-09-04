@@ -3,8 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/bg_gradient_teal">
+    android:layout_height="match_parent">
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardLogin"
@@ -71,14 +70,6 @@
                     android:inputType="textPassword"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView
-                android:id="@+id/tvForgot"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Lupa password?"
-                android:textColor="?attr/colorPrimary"
-                android:layout_marginTop="4dp"
-                android:layout_gravity="end"/>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnLogin"
@@ -87,9 +78,7 @@
                 android:layout_marginTop="16dp"
                 android:text="Masuk"
                 android:textAllCaps="false"
-                android:backgroundTint="?attr/colorPrimary"
-                android:insetTop="14dp"
-                android:insetBottom="14dp"/>
+                android:backgroundTint="?attr/colorPrimary"/>
 
             <TextView
                 android:id="@+id/tvFooter"

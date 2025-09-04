@@ -2,59 +2,48 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bgSurface">
 
-    <ScrollView
+    <!-- Konten scroll -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/content_scroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
         android:padding="20dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
+        <!-- Wajib: child LinearLayout harus punya width/height -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-
-                <LinearLayout
-                    android:layout_width="match_parent"
+            <!-- Greeting -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+                <TextView
+                    android:id="@+id/tvHello"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
-                        android:orientation="horizontal">
-                        <TextView
-                            android:id="@+id/tvHello"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Hello, "
-                            android:textStyle="bold"
-                            android:textSize="18sp"/>
-                        <TextView
-                            android:id="@+id/tvName"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Ivan Setiawan"
-                            android:textStyle="bold"
-                            android:textSize="18sp"
-                            android:textColor="@color/nsiBlueLight"/>
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tvSubtitle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Absensi Anda"
-                        android:alpha="0.8"
-                        android:layout_marginTop="2dp"
-                        android:textStyle="bold"/>
-                </LinearLayout>
+                    android:text="Hello, "
+                    android:textStyle="bold"
+                    android:textSize="20sp"/>
+                <TextView
+                    android:id="@+id/tvName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Employee"
+                    android:textStyle="bold"
+                    android:textSize="20sp"
+                    android:textColor="@color/nsiBlueLight"/>
+            </LinearLayout>
 
             <!-- Time & Date -->
             <LinearLayout
@@ -62,16 +51,14 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:layout_marginTop="18dp">
-
+                android:layout_marginTop="4dp">
                 <TextView
                     android:id="@+id/tvTime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="08:30 AM"
+                    android:text="08:30:00"
                     android:textStyle="bold"
                     android:textSize="36sp"/>
-
                 <TextView
                     android:id="@+id/tvDate"
                     android:layout_width="wrap_content"
@@ -81,19 +68,17 @@
                     android:layout_marginTop="4dp"/>
             </LinearLayout>
 
-            <!-- Big Check-in button with ring -->
+            <!-- Tombol besar -->
             <FrameLayout
                 android:layout_width="220dp"
                 android:layout_height="220dp"
                 android:layout_gravity="center"
                 android:layout_marginTop="18dp">
-
                 <ImageView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:src="@drawable/bg_ring_double"
                     android:contentDescription="@null"/>
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCheckIn"
                     style="@style/Widget.Material3.Button"
@@ -108,86 +93,134 @@
                     android:insetBottom="0dp"/>
             </FrameLayout>
 
-            <!-- Stats row -->
+            <!-- Kartu statistik -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                app:cardCornerRadius="16dp"
+                app:strokeColor="@android:color/transparent"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="14dp"
+                    android:weightSum="3"
+                    android:gravity="center_vertical">
+
+                    <!-- IN -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_login_24"/>
+                        <TextView
+                            android:id="@+id/tvStatIn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--:--"
+                            android:textStyle="bold"
+                            android:textSize="16sp"
+                            android:layout_marginTop="6dp"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Absen Masuk"
+                            android:alpha="0.6"/>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="44dp"
+                        android:background="@android:color/darker_gray"
+                        android:alpha="0.2"
+                        android:layout_marginHorizontal="8dp"/>
+
+                    <!-- OUT -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_logout_24"/>
+                        <TextView
+                            android:id="@+id/tvStatOut"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--:--"
+                            android:textStyle="bold"
+                            android:textSize="16sp"
+                            android:layout_marginTop="6dp"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Absen Pulang"
+                            android:alpha="0.6"/>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="44dp"
+                        android:background="@android:color/darker_gray"
+                        android:alpha="0.2"
+                        android:layout_marginHorizontal="8dp"/>
+
+                    <!-- TOTAL -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_timer_24"/>
+                        <TextView
+                            android:id="@+id/tvStatTotal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--:--"
+                            android:textStyle="bold"
+                            android:textSize="16sp"
+                            android:layout_marginTop="6dp"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Total Jam"
+                            android:alpha="0.6"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Tombol riwayat -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center"
-                android:layout_marginTop="22dp"
-                android:weightSum="3">
-
-                <LinearLayout
-                    android:layout_width="0dp"
+                android:layout_marginTop="18dp">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnHistory"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_login_24"/>
-                    <TextView
-                        android:id="@+id/tvStatIn"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="--:--"
-                        android:textStyle="bold"
-                        android:layout_marginTop="6dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Checked in"
-                        android:alpha="0.6"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_logout_24"/>
-                    <TextView
-                        android:id="@+id/tvStatOut"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="--:--"
-                        android:textStyle="bold"
-                        android:layout_marginTop="6dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Checked out"
-                        android:alpha="0.6"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_timer_24"/>
-                    <TextView
-                        android:id="@+id/tvStatTotal"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="--:--"
-                        android:textStyle="bold"
-                        android:layout_marginTop="6dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Total hours"
-                        android:alpha="0.6"/>
-                </LinearLayout>
+                    android:text="Riwayat Absensi"
+                    android:textAllCaps="false"
+                    app:icon="@drawable/ic_history_24"
+                    app:iconPadding="8dp"
+                    app:iconGravity="textStart"/>
             </LinearLayout>
 
             <!-- Spacer -->
@@ -195,6 +228,17 @@
                 android:layout_width="match_parent"
                 android:layout_height="80dp"/>
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
+    <!-- FAB (opsional) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabHistory"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/app_name"
+        app:srcCompat="@drawable/ic_history_24"
+        android:layout_margin="16dp"
+        app:layout_anchor="@id/content_scroll"
+        app:layout_anchorGravity="bottom|end"
+        android:visibility="gone"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

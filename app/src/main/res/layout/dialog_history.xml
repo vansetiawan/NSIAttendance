@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:padding="16dp"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+
+    <TextView
+        android:id="@+id/tvHistDate"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Tanggal" android:textStyle="bold" android:textSize="16sp"
+        android:paddingBottom="8dp"/>
+
+    <ListView
+        android:id="@+id/lvHistory"
+        android:layout_width="match_parent" android:layout_height="200dp"
+        android:divider="@android:color/darker_gray" android:dividerHeight="0.5dp"
+        android:listSelector="@android:color/transparent"/>
+
+    <TextView
+        android:id="@+id/tvEmpty"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Belum ada data hari ini" android:gravity="center"
+        android:padding="12dp" android:visibility="gone"/>
+
+    <View android:layout_width="match_parent" android:layout_height="8dp"/>
+
+    <TextView
+        android:id="@+id/tvHistSummary"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Ringkasan" android:textStyle="bold"/>
+
+    <ProgressBar
+        android:id="@+id/progress"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center" android:visibility="gone"
+        android:paddingTop="8dp"/>
+</LinearLayout>
