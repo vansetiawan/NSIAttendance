@@ -1,4 +1,4 @@
-package com.example.nsiattendance;
+package com.example.attendance;
 
 import org.junit.Test;
 
