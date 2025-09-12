@@ -1,6 +1,6 @@
 package com.nsi.attendance;
 
-import static com.example.attendance.MyConstants.API_URL;
+import static com.nsi.attendance.MyConstants.API_URL;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -24,12 +24,15 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.Manifest;
+import android.os.Build;
+
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.android.volley.BuildConfig;
 import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.NoConnectionError;
 import com.android.volley.Request;
@@ -60,7 +63,7 @@ import java.util.TimeZone;
 
 public class MainActivity extends AppCompatActivity {
 
-    private TextView tvTime, tvDate, tvName, tvHello, tvStatIn, tvStatOut, tvStatTotal;
+    private TextView tvTime, tvDate, tvName, tvHello, tvStatIn, tvStatOut, tvStatTotal, tvVersion;
     private MaterialButton btnAction; // satu tombol untuk IN/OUT
     private View root;
 
@@ -84,6 +87,9 @@ public class MainActivity extends AppCompatActivity {
     private static final long LOC_TIMEOUT_MS = 10000; // 10 dtk timeout fallback
     private boolean isSubmitting = false;
     private static final String REQ_TAG_CHECK = "req_check";
+    private Location lastFix = null;
+    private boolean lastFixMock = false;
+    private @Nullable String pendingEndpoint = null;
 
     private final Runnable clockTick = new Runnable() {
         @Override public void run() {
@@ -118,6 +124,8 @@ public class MainActivity extends AppCompatActivity {
         tvStatOut   = findViewById(R.id.tvStatOut);
         tvStatTotal = findViewById(R.id.tvStatTotal);
         btnAction   = findViewById(R.id.btnCheckIn); // pakai id yg sudah ada
+        tvVersion = findViewById(R.id.tvVersion);
+        if (tvVersion != null) tvVersion.setText(getVersionLabel());
         flp = LocationServices.getFusedLocationProviderClient(this);
         lm  = (LocationManager) getSystemService(LOCATION_SERVICE);
         locTimeoutHandler = new android.os.Handler(Looper.getMainLooper());
@@ -204,6 +212,14 @@ public class MainActivity extends AppCompatActivity {
                     .addOnSuccessListener(loc -> {
                         delivered[0] = true;
                         if (loc != null) {
+                            String err = validateLocation(loc);
+                            if (err != null) {
+                                Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+                                finishSubmitting();
+                                return;
+                            }
+                            // set state lokasi terakhir
+                            lastFix = loc;
                             lastLat = loc.getLatitude();
                             lastLng = loc.getLongitude();
                             lastAcc = loc.hasAccuracy() ? (int) loc.getAccuracy() : 0;
@@ -237,13 +253,21 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        if (best != null && (System.currentTimeMillis() - best.getTime()) <= 2 * 60_000) { // <= 2 menit
+        if (best != null && (System.currentTimeMillis() - best.getTime()) <= 2 * 60_000) {
+            String err = validateLocation(best);
+            if (err != null) {
+                Toast.makeText(MainActivity.this, err, Toast.LENGTH_LONG).show();
+                finishSubmitting();
+                return;
+            }
+            lastFix = best;
             lastLat = best.getLatitude();
             lastLng = best.getLongitude();
             lastAcc = best.hasAccuracy() ? (int) best.getAccuracy() : 0;
             doCheck(endpoint);
             return;
         }
+
 
         // 5b. Minta update sekali dari provider yang tersedia
         Criteria c = new Criteria();
@@ -255,13 +279,22 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onLocationChanged(Location loc) {
                 stopLMUpdates();
                 if (loc != null) {
+                    String err = validateLocation(loc);
+                    if (err != null) {
+                        Toast.makeText(MainActivity.this, err, Toast.LENGTH_LONG).show();
+                        finishSubmitting();
+                        return;
+                    }
+                    lastFix = loc;
                     lastLat = loc.getLatitude();
                     lastLng = loc.getLongitude();
                     lastAcc = loc.hasAccuracy() ? (int) loc.getAccuracy() : 0;
                     doCheck(endpoint);
                 } else {
                     Toast.makeText(MainActivity.this, "Lokasi belum tersedia.", Toast.LENGTH_LONG).show();
+                    finishSubmitting();
                 }
+
             }
             @Override public void onStatusChanged(String s, int i, Bundle b) {}
             @Override public void onProviderEnabled(String s) {}
@@ -281,6 +314,7 @@ public class MainActivity extends AppCompatActivity {
             if (lmListener != null) {
                 stopLMUpdates();
                 Toast.makeText(MainActivity.this, "Gagal mendapatkan lokasi. Coba lagi.", Toast.LENGTH_LONG).show();
+                finishSubmitting();
             }
         }, LOC_TIMEOUT_MS);
     }
@@ -335,18 +369,30 @@ public class MainActivity extends AppCompatActivity {
 
     private void onActionButtonClicked() {
         if (!NetworkUtil.isOnline(this)) {
-            Snackbar.make(root, "Tidak ada koneksi internet. Aktifkan internet untuk absen.",
-                    Snackbar.LENGTH_LONG).show();
+            Snackbar.make(root, "Tidak ada koneksi internet. Aktifkan internet untuk absen.", Snackbar.LENGTH_LONG).show();
             return;
         }
         if (isSubmitting) return;
+
         String ep = (state == DayState.BEFORE_IN) ? "check-in" : "check-out";
+
+        // Jika belum ada izin → simpan endpoint, minta izin, JANGAN disable tombol.
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            pendingEndpoint = ep;
+            ActivityCompat.requestPermissions(this,
+                    new String[]{ Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION },
+                    REQ_LOC);
+            return;
+        }
+
+        // Sudah ada izin → lanjut proses
         isSubmitting = true;
         btnAction.setEnabled(false);
         btnAction.setText("Memproses…");
-
         fetchLocationThenSubmitCompat(ep);
     }
+
 
     private void finishSubmitting() {
         isSubmitting = false;
@@ -388,7 +434,6 @@ public class MainActivity extends AppCompatActivity {
     private void doCheck(String endpoint) {
         String url = API_URL + endpoint;
 
-        // batalkan request sebelumnya dg tag yg sama
         VolleySingleton.getInstance(this).cancelAll(REQ_TAG_CHECK);
 
         StringRequest req = new StringRequest(Request.Method.POST, url, resp -> {
@@ -444,13 +489,12 @@ public class MainActivity extends AppCompatActivity {
                 m.put("id", String.valueOf(session.getUserId()));
                 m.put("unique_code", session.getUnique());
                 m.put("area_code", session.getAreaCode());
+                m.put("is_mock", lastFixMock ? "1" : "0");
                 if (lastLat != null && lastLng != null) {
                     m.put("lat", String.valueOf(lastLat));
                     m.put("lng", String.valueOf(lastLng));
                     if (lastAcc != null) m.put("acc", String.valueOf(lastAcc));
                 }
-                // opsional: idempotency
-                // m.put("request_id", java.util.UUID.randomUUID().toString());
                 return m;
             }
         };
@@ -462,9 +506,6 @@ public class MainActivity extends AppCompatActivity {
         VolleySingleton.getInstance(this).add(req);
     }
 
-    /* ---------------- Utils ---------------- */
-
-    // input bisa "YYYY-MM-DD HH:MM:SS" atau "HH:MM:SS" -> hasil "HH:MM"
     private String hhmm(String s) {
         if (s == null) return "--:--";
         if (s.length() >= 16 && s.charAt(4) == '-') return s.substring(11,16);
@@ -472,7 +513,6 @@ public class MainActivity extends AppCompatActivity {
         return s;
     }
 
-    // hitung total HH:MM jika in & out ada
     private String calcTotal(String inStr, String outStr) {
         try {
             if (inStr == null || outStr == null) return "--:--";
@@ -511,9 +551,7 @@ public class MainActivity extends AppCompatActivity {
                     msg = j.optString("message", msg);
                 }
             } catch (Exception ignore) {
-                // biarkan msg default
             }
-//            msg = "HTTP " + sc + " • " + msg;
         }
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
     }
@@ -535,14 +573,34 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_LOC) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // izin diberikan; kalau kamu memanggil fetchLocationThenSubmit dari tombol,
-                // kamu bisa panggil lagi di sini kalau perlu.
+            boolean granted = true;
+            if (grantResults == null || grantResults.length == 0) {
+                granted = false;
             } else {
+                for (int g : grantResults) {
+                    if (g != PackageManager.PERMISSION_GRANTED) { granted = false; break; }
+                }
+            }
+
+            if (granted) {
+                // auto-continue
+                String ep = (pendingEndpoint != null) ? pendingEndpoint
+                        : (state == DayState.BEFORE_IN ? "check-in" : "check-out");
+                pendingEndpoint = null;
+
+                isSubmitting = true;
+                btnAction.setEnabled(false);
+                btnAction.setText("Memproses…");
+                fetchLocationThenSubmitCompat(ep);
+            } else {
+                // reset UI
+                isSubmitting = false;
+                applyState();
                 Toast.makeText(this, "Izin lokasi diperlukan untuk absen.", Toast.LENGTH_LONG).show();
             }
         }
     }
+
 
     private void showTodayHistoryDialog() {
         String url = API_URL + "attendance-history";
@@ -875,5 +933,62 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /** Deteksi lokasi palsu + kualitas dasar. Return null jika lolos, atau pesan error jika ditolak. */
+    private @Nullable String validateLocation(Location loc) {
+        if (loc == null) return "Lokasi belum tersedia.";
+        // 1) mock flag
+        boolean mocked = false;
+        if (Build.VERSION.SDK_INT >= 31) mocked = loc.isMock();
+        mocked = mocked || loc.isFromMockProvider();
+        lastFixMock = mocked;
 
+        // 2) akurasi (tolak kalau >100 m)
+        float acc = loc.hasAccuracy() ? loc.getAccuracy() : Float.MAX_VALUE;
+        if (acc > 100f) return "Akurasi lokasi buruk (>100m). Pindah ke area terbuka lalu coba lagi.";
+
+        // 3) sanity check loncatan/kecepatan bila ada titik sebelumnya
+        if (lastFix != null) {
+            long dtMs = Math.max(1, loc.getTime() - lastFix.getTime());
+            double distM = haversine(lastFix.getLatitude(), lastFix.getLongitude(),
+                    loc.getLatitude(), loc.getLongitude());
+            double kmh = (distM / (dtMs / 1000.0)) * 3.6;
+            if (kmh > 150.0 || (distM > 1000.0 && dtMs <= 60_000)) {
+                return "Pergerakan tidak wajar terdeteksi. Coba lagi tanpa mock GPS.";
+            }
+        }
+        return mocked ? "Deteksi lokasi palsu (mock). Matikan aplikasi Fake GPS." : null;
+    }
+
+    /** Haversine meter */
+    private static double haversine(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371000.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat/2)*Math.sin(dLat/2)
+                + Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon/2)*Math.sin(dLon/2);
+        return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    private String getVersionLabel() {
+        try {
+            android.content.pm.PackageManager pm = getPackageManager();
+            android.content.pm.PackageInfo p;
+
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                p = pm.getPackageInfo(
+                        getPackageName(),
+                        android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                );
+            } else {
+                p = pm.getPackageInfo(getPackageName(), 0); // <— HAPUS "flags: 0"
+            }
+
+            String name = (p.versionName != null) ? p.versionName : "-";
+
+            return "v" + name;
+        } catch (Exception e) {
+            return "v- • " + BuildConfig.BUILD_TYPE;
+        }
+    }
 }

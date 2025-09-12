@@ -1,4 +1,4 @@
-package com.example.attendance;
+package com.nsi.attendance;
 
 import android.content.Context;
 

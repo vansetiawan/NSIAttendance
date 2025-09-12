@@ -241,4 +241,17 @@
         app:layout_anchor="@id/content_scroll"
         app:layout_anchorGravity="bottom|end"
         android:visibility="gone"/>
+
+    <!-- ... di dalam CoordinatorLayout, setelah FAB atau sebelum penutup -->
+    <TextView
+        android:id="@+id/tvVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="v-"
+        android:textSize="12sp"
+        android:alpha="0.6"
+        android:layout_margin="12dp"
+        app:layout_anchor="@id/content_scroll"
+        app:layout_anchorGravity="bottom|center" />
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

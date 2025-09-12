@@ -1,6 +1,6 @@
 package com.nsi.attendance;
 
-import static com.example.attendance.MyConstants.API_URL;
+import static com.nsi.attendance.MyConstants.API_URL;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -78,5 +78,5 @@ public class SplashActivity extends AppCompatActivity {
         startActivity(new Intent(this, MainActivity.class));
         finish();
     }
-    private void goLogin() { startActivity(new Intent(this, com.example.attendance.LoginActivity.class)); finish(); }
+    private void goLogin() { startActivity(new Intent(this, com.nsi.attendance.LoginActivity.class)); finish(); }
 }

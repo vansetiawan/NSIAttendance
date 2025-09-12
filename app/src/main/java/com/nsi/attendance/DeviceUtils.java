@@ -1,4 +1,3 @@
-// DeviceUtils.java
 package com.nsi.attendance;
 
 import android.content.Context;

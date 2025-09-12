@@ -1,7 +1,6 @@
-// LoginActivity.java (cuplikan inti)
 package com.nsi.attendance;
 
-import static com.example.attendance.MyConstants.API_URL;
+import static com.nsi.attendance.MyConstants.API_URL;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
@@ -22,6 +21,7 @@ import java.util.Map;
 
 public class LoginActivity extends AppCompatActivity {
 
+    private TextView tvVersionLogin;
     private EditText edtUsername, edtPassword;
     private Button btnLogin;
     private SessionManager session;
@@ -35,6 +35,8 @@ public class LoginActivity extends AppCompatActivity {
         edtUsername = findViewById(R.id.edtUsername);
         edtPassword = findViewById(R.id.edtPassword);
         btnLogin    = findViewById(R.id.btnLogin);
+        tvVersionLogin = findViewById(R.id.tvVersionLogin);
+        if (tvVersionLogin != null) tvVersionLogin.setText(getVersionLabel());
         btnLogin.setOnClickListener(v -> doLogin());
     }
 
@@ -150,6 +152,29 @@ public class LoginActivity extends AppCompatActivity {
         req.setRetryPolicy(new DefaultRetryPolicy(15000, 0, 1f));
         VolleySingleton.getInstance(this).add(req);
     }
+
+    private String getVersionLabel() {
+        try {
+            android.content.pm.PackageManager pm = getPackageManager();
+            android.content.pm.PackageInfo p;
+
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                p = pm.getPackageInfo(
+                        getPackageName(),
+                        android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                );
+            } else {
+                p = pm.getPackageInfo(getPackageName(), 0); // <— HAPUS "flags: 0"
+            }
+
+            String name = (p.versionName != null) ? p.versionName : "-";
+
+            return "v" + name;
+        } catch (Exception e) {
+            return "v- • " + BuildConfig.BUILD_TYPE;
+        }
+    }
+
 
     private void goHome() {
         startActivity(new Intent(this, MainActivity.class));
