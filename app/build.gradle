@@ -10,8 +10,8 @@ android {
         applicationId "com.nsi.attendance"
         minSdk 24
         targetSdk 35
-        versionCode 3
-        versionName "250912.001"
+        versionCode 9
+        versionName "251007.002"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

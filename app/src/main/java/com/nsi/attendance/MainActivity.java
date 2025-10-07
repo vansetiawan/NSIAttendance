@@ -73,6 +73,12 @@ public class MainActivity extends AppCompatActivity {
 
     private SessionManager session;
     private String lastGreeting = "";
+    // fields
+    private final java.util.concurrent.atomic.AtomicBoolean sentOnce = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private CancellationTokenSource cts;
+    private Runnable fallbackRunnable;
+    private String activeRequestId; // dipakai ulang utk semua percobaan dari satu tap
+
 
     // state harian
     private enum DayState { BEFORE_IN, AFTER_IN, DONE }
@@ -179,10 +185,26 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onPause() {
         handler.removeCallbacks(clockTick);
         stopLMUpdates();
+        if (cts != null) cts.cancel();
+        if (fallbackRunnable != null) locTimeoutHandler.removeCallbacks(fallbackRunnable);
         super.onPause();
     }
 
+
     /* ---------------- UI helpers ---------------- */
+
+    private boolean isLocationServiceOn() {
+        if (Build.VERSION.SDK_INT >= 28) {
+            return lm != null && lm.isLocationEnabled();
+        } else {
+            try {
+                boolean gps = lm != null && lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                boolean net = lm != null && lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                return gps || net;
+            } catch (Exception e) { return false; }
+        }
+    }
+
 
     private void updateGreeting() {
         String greet = getGreetingWIBServer();
@@ -197,111 +219,104 @@ public class MainActivity extends AppCompatActivity {
         if (!ensureLocationPermission()) return;
 
         if (hasPlayServices()) {
-            // Coba Fused dulu, tapi siapkan timeout untuk fallback
-            CancellationTokenSource cts = new CancellationTokenSource();
-            final boolean[] delivered = { false };
+            cts = new CancellationTokenSource();
 
-            locTimeoutHandler.postDelayed(() -> {
-                if (!delivered[0]) {
-                    // fallback
-                    requestSingleLocationWithLM(endpoint);
-                }
-            }, 2500); // kasih 2.5 detik dulu ke Fused
+            // fallback ke LM jika FLP telat
+            fallbackRunnable = () -> {
+                if (sentOnce.get()) return;
+                if (cts != null) cts.cancel();          // hentikan FLP
+                requestSingleLocationWithLM(endpoint);  // jalur LM
+            };
+            locTimeoutHandler.postDelayed(fallbackRunnable, 2500);
 
             flp.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.getToken())
                     .addOnSuccessListener(loc -> {
-                        delivered[0] = true;
-                        if (loc != null) {
-                            String err = validateLocation(loc);
-                            if (err != null) {
-                                Toast.makeText(this, err, Toast.LENGTH_LONG).show();
-                                finishSubmitting();
-                                return;
-                            }
-                            // set state lokasi terakhir
-                            lastFix = loc;
-                            lastLat = loc.getLatitude();
-                            lastLng = loc.getLongitude();
-                            lastAcc = loc.hasAccuracy() ? (int) loc.getAccuracy() : 0;
-                            doCheck(endpoint);
-                        } else {
-                            requestSingleLocationWithLM(endpoint);
-                        }
+                        if (sentOnce.get()) return;
+                        if (loc != null) submitWithLocation(loc, endpoint);
+                        else fallbackRunnable.run();
                     })
                     .addOnFailureListener(e -> {
-                        delivered[0] = true;
-                        requestSingleLocationWithLM(endpoint);
+                        if (!sentOnce.get()) fallbackRunnable.run();
                     });
+
         } else {
-            // Tidak ada Play Services → langsung fallback
+            // Tidak ada Google Play Services → langsung pakai LM
             requestSingleLocationWithLM(endpoint);
         }
     }
+
+    private void submitWithLocation(Location loc, String endpoint) {
+        String err = validateLocation(loc);
+        if (err != null) { Toast.makeText(this, err, Toast.LENGTH_LONG).show(); finishSubmitting(); return; }
+
+        if (!sentOnce.compareAndSet(false, true)) return; // pastikan hanya sekali
+        if (fallbackRunnable != null) locTimeoutHandler.removeCallbacks(fallbackRunnable);
+        if (cts != null) cts.cancel();
+        stopLMUpdates();
+
+        lastFix = loc;
+        lastLat = loc.getLatitude();
+        lastLng = loc.getLongitude();
+        lastAcc = loc.hasAccuracy() ? (int) loc.getAccuracy() : 0;
+        doCheck(endpoint);
+    }
+
 
     @SuppressLint("MissingPermission")
     private void requestSingleLocationWithLM(String endpoint) {
         if (!ensureLocationPermission()) return;
 
-        // 5a. Coba last known location dulu
+        // 1) Coba last known (maks 2 menit)
         Location best = null;
         for (String p : new String[]{ LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER }) {
             if (lm.isProviderEnabled(p)) {
                 Location l = lm.getLastKnownLocation(p);
-                if (l != null) {
-                    if (best == null) best = l;
-                    else if (l.getTime() > best.getTime()) best = l;
-                }
+                if (l != null && (best == null || l.getTime() > best.getTime())) best = l;
             }
         }
         if (best != null && (System.currentTimeMillis() - best.getTime()) <= 2 * 60_000) {
             String err = validateLocation(best);
-            if (err != null) {
-                Toast.makeText(MainActivity.this, err, Toast.LENGTH_LONG).show();
-                finishSubmitting();
+            if (err == null) {
+                submitWithLocation(best, endpoint);
                 return;
+            } else {
+                // ⬇️ dulu: Toast + finishSubmitting(); return;
+                // sekarang: cukup log & LANJUT minta update baru
+                Log.w("LM", "LastKnown tidak layak: " + err);
+                // (biarkan lanjut ke requestLocationUpdates + timeout bawaan)
             }
-            lastFix = best;
-            lastLat = best.getLatitude();
-            lastLng = best.getLongitude();
-            lastAcc = best.hasAccuracy() ? (int) best.getAccuracy() : 0;
-            doCheck(endpoint);
-            return;
         }
 
 
-        // 5b. Minta update sekali dari provider yang tersedia
+        // 2) One-shot update dari provider
         Criteria c = new Criteria();
-        c.setAccuracy(Criteria.ACCURACY_FINE);     // prefer GPS
+        c.setAccuracy(Criteria.ACCURACY_FINE);
         c.setPowerRequirement(Criteria.POWER_HIGH);
-        final String provider = lm.getBestProvider(c, true);
 
         lmListener = new LocationListener() {
             @Override public void onLocationChanged(Location loc) {
                 stopLMUpdates();
-                if (loc != null) {
-                    String err = validateLocation(loc);
-                    if (err != null) {
-                        Toast.makeText(MainActivity.this, err, Toast.LENGTH_LONG).show();
+                if (loc == null) {
+                    if (!sentOnce.get()) {
+                        Toast.makeText(MainActivity.this, "Lokasi belum tersedia.", Toast.LENGTH_LONG).show();
                         finishSubmitting();
-                        return;
                     }
-                    lastFix = loc;
-                    lastLat = loc.getLatitude();
-                    lastLng = loc.getLongitude();
-                    lastAcc = loc.hasAccuracy() ? (int) loc.getAccuracy() : 0;
-                    doCheck(endpoint);
-                } else {
-                    Toast.makeText(MainActivity.this, "Lokasi belum tersedia.", Toast.LENGTH_LONG).show();
-                    finishSubmitting();
+                    return;
                 }
-
+                String err = validateLocation(loc);
+                if (err != null) {
+                    Toast.makeText(MainActivity.this, err, Toast.LENGTH_LONG).show();
+                    finishSubmitting();
+                    return;
+                }
+                // ⬇️ KUNCI: kirim via submitWithLocation (bukan doCheck langsung)
+                submitWithLocation(loc, endpoint);
             }
             @Override public void onStatusChanged(String s, int i, Bundle b) {}
             @Override public void onProviderEnabled(String s) {}
             @Override public void onProviderDisabled(String s) {}
         };
 
-        // request dari GPS dan Network sekaligus (yang datang duluan dipakai)
         try {
             if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER))
                 lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, lmListener, Looper.getMainLooper());
@@ -309,15 +324,18 @@ public class MainActivity extends AppCompatActivity {
                 lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, lmListener, Looper.getMainLooper());
         } catch (SecurityException ignored) {}
 
-        // Timeout: hentikan kalau nggak dapat juga
+        // Timeout aman: hanya tampilkan error bila belum ada submit
         locTimeoutHandler.postDelayed(() -> {
             if (lmListener != null) {
                 stopLMUpdates();
-                Toast.makeText(MainActivity.this, "Gagal mendapatkan lokasi. Coba lagi.", Toast.LENGTH_LONG).show();
-                finishSubmitting();
+                if (!sentOnce.get()) {
+                    Toast.makeText(MainActivity.this, "Gagal mendapatkan lokasi. Coba lagi.", Toast.LENGTH_LONG).show();
+                    finishSubmitting();
+                }
             }
         }, LOC_TIMEOUT_MS);
     }
+
 
     private void stopLMUpdates() {
         try { if (lmListener != null) lm.removeUpdates(lmListener); } catch (Exception ignored) {}
@@ -368,6 +386,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onActionButtonClicked() {
+        sentOnce.set(false);
+        activeRequestId = java.util.UUID.randomUUID().toString(); // satu ID untuk 1 tap
+
         if (!NetworkUtil.isOnline(this)) {
             Snackbar.make(root, "Tidak ada koneksi internet. Aktifkan internet untuk absen.", Snackbar.LENGTH_LONG).show();
             return;
@@ -387,6 +408,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Sudah ada izin → lanjut proses
+        if (!isLocationServiceOn()) {
+            Snackbar.make(root, "Layanan lokasi dimatikan. Aktifkan GPS/Location dulu.", Snackbar.LENGTH_LONG)
+                    .setAction("Pengaturan", v -> startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)))
+                    .show();
+            return; // JANGAN masuk ke “Memproses…”
+        }
         isSubmitting = true;
         btnAction.setEnabled(false);
         btnAction.setText("Memproses…");
@@ -397,7 +424,7 @@ public class MainActivity extends AppCompatActivity {
     private void finishSubmitting() {
         isSubmitting = false;
         btnAction.setEnabled(true);
-        applyState();                             // kembalikan label Check In/Out
+        applyState();
     }
 
     private void fetchAttendanceStatus() {
@@ -456,10 +483,36 @@ public class MainActivity extends AppCompatActivity {
                     applyState();
                 } else {
                     JSONObject err = js.optJSONObject("error");
-                    String msg = err != null ? err.optString("message","Gagal proses") : "Gagal proses";
-                    int retry = err != null ? err.optInt("retry_after_sec", 0) : 0;
+                    String msg = "Gagal proses";
+                    int retry = 0;
+
+                    if (err != null) {
+                        msg = err.optString("message", msg);
+                        retry = err.optInt("retry_after_sec", 0);
+
+                        // ===== tampilkan info lokasi terdekat bila ada =====
+                        JSONObject nearest = err.optJSONObject("nearest");
+                        if (nearest != null) {
+                            String nearName = nearest.optString("name", "");
+                            Integer dist = nearest.has("distance_m") ? nearest.optInt("distance_m") : null;
+                            Integer rad  = nearest.has("radius_m")   ? nearest.optInt("radius_m")   : null;
+
+                            StringBuilder sb = new StringBuilder();
+                            if (nearName != null && !nearName.isEmpty()) {
+                                sb.append("Lokasi terdekat: ").append(nearName);
+                                if (dist != null) sb.append(" (≈").append(dist).append(" m");
+                                if (rad  != null) sb.append(", radius ").append(rad).append(" m");
+                                if (dist != null || rad != null) sb.append(")");
+                                sb.append(". ");
+                            }
+                            sb.append(msg);
+                            msg = sb.toString();
+                        }
+                    }
+
                     Toast.makeText(this, msg + (retry>0? (" ("+retry+" dtk)"):""), Toast.LENGTH_LONG).show();
                 }
+
             } catch (Exception e) {
                 Toast.makeText(this, "Parse error", Toast.LENGTH_LONG).show();
             } finally {
@@ -483,9 +536,11 @@ public class MainActivity extends AppCompatActivity {
             finishSubmitting();
         }) {
             @Override protected Map<String, String> getParams() {
-                String requestId = java.util.UUID.randomUUID().toString();
                 Map<String, String> m = new HashMap<>();
-                m.put("request_id", requestId);
+                String rid = (activeRequestId != null)
+                        ? activeRequestId
+                        : java.util.UUID.randomUUID().toString();
+                m.put("request_id", rid);
                 m.put("id", String.valueOf(session.getUserId()));
                 m.put("unique_code", session.getUnique());
                 m.put("area_code", session.getAreaCode());
@@ -557,18 +612,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean ensureLocationPermission() {
-        boolean fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED;
-        boolean coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED;
-        if (!fine && !coarse) {
+        boolean fine = ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+
+        if (!fine) {
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
-                    REQ_LOC);
+                    new String[]{ Manifest.permission.ACCESS_FINE_LOCATION }, REQ_LOC);
+            Toast.makeText(this, "Lokasi presisi tidak aktif, segera ubah ke lokasi presisi", Toast.LENGTH_LONG).show();
             return false;
         }
         return true;
     }
+
+    // opsional helper buka App Settings:
+    private void openAppSettings() {
+        Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        i.setData(android.net.Uri.fromParts("package", getPackageName(), null));
+        startActivity(i);
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -591,6 +653,15 @@ public class MainActivity extends AppCompatActivity {
                 isSubmitting = true;
                 btnAction.setEnabled(false);
                 btnAction.setText("Memproses…");
+                if (!isLocationServiceOn()) {
+                    // batal mulai akuisisi agar tombol tidak “memproses” sia-sia
+                    isSubmitting = false;
+                    applyState();
+                    Snackbar.make(root, "Layanan lokasi dimatikan. Aktifkan GPS/Location dulu.", Snackbar.LENGTH_LONG)
+                            .setAction("Pengaturan", v -> startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)))
+                            .show();
+                    return;
+                }
                 fetchLocationThenSubmitCompat(ep);
             } else {
                 // reset UI
@@ -826,7 +897,7 @@ public class MainActivity extends AppCompatActivity {
             tvDate.setText(it.date);
             String fi = (it.firstIn == null ? "-" : it.firstIn);
             String lo = (it.lastOut == null ? "-" : it.lastOut);
-            tvMeta.setText("IN " + fi + " • OUT " + lo + " • Total " + it.total + " • " + it.inCount + "/" + it.outCount);
+            tvMeta.setText("Masuk " + fi + " • Pulang " + lo);
             return cv;
         }
     }

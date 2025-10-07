@@ -51,8 +51,7 @@
                     android:id="@+id/edtUsername"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Email / Username"
-                    android:inputType="textEmailAddress"/>
+                    android:hint="@string/username_nip"/>
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout

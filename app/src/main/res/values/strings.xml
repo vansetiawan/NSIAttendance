@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">NSI Attendance</string>
     <string name="title_activity_login">NSI Attendance</string>
+    <string name="username_nip">Username / NIP</string>
 </resources>
