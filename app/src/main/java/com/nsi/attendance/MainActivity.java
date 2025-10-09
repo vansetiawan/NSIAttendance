@@ -431,6 +431,10 @@ public class MainActivity extends AppCompatActivity {
         String url = API_URL + "attendance-status";
         StringRequest req = new StringRequest(Request.Method.POST, url, resp -> {
             try {
+                String s = (resp == null ? "" : resp.trim());
+                if (s.isEmpty() || s.charAt(0) == '<') {
+                    return;
+                }
                 JSONObject js = new JSONObject(resp);
                 if (!js.has("data")) return;
                 JSONObject d = js.getJSONObject("data");
@@ -465,6 +469,11 @@ public class MainActivity extends AppCompatActivity {
 
         StringRequest req = new StringRequest(Request.Method.POST, url, resp -> {
             try {
+                String s = (resp == null ? "" : resp.trim());
+                if (s.isEmpty() || s.charAt(0) == '<') {
+                    Toast.makeText(this, "Server mengirim respons tidak valid. Coba lagi.", Toast.LENGTH_LONG).show();
+                    return;
+                }
                 JSONObject js = new JSONObject(resp);
                 if (js.has("data")) {
                     JSONObject d = js.getJSONObject("data");
@@ -509,7 +518,6 @@ public class MainActivity extends AppCompatActivity {
                             msg = sb.toString();
                         }
                     }
-
                     Toast.makeText(this, msg + (retry>0? (" ("+retry+" dtk)"):""), Toast.LENGTH_LONG).show();
                 }
 
@@ -678,6 +686,11 @@ public class MainActivity extends AppCompatActivity {
 
         StringRequest req = new StringRequest(Request.Method.POST, url, resp -> {
             try {
+                String s = (resp == null ? "" : resp.trim());
+                if (s.isEmpty() || s.charAt(0) == '<') {
+                    Toast.makeText(this, "Server mengirim respons tidak valid. Coba lagi.", Toast.LENGTH_LONG).show();
+                    return;
+                }
                 JSONObject js = new JSONObject(resp);
                 JSONObject d = js.getJSONObject("data");
                 String date = d.getString("date");
@@ -807,6 +820,11 @@ public class MainActivity extends AppCompatActivity {
         StringRequest req = new StringRequest(Request.Method.POST, url, resp -> {
             progress.setVisibility(View.GONE);
             try {
+                String s = (resp == null ? "" : resp.trim());
+                if (s.isEmpty() || s.charAt(0) == '<') {
+                    Toast.makeText(this, "Server mengirim respons tidak valid. Coba lagi.", Toast.LENGTH_LONG).show();
+                    return;
+                }
                 JSONObject js = new JSONObject(resp);
                 if (!js.has("data")) {
                     tvSum.setText("Gagal memuat data.");

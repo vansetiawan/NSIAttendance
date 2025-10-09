@@ -30,6 +30,10 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         session = new SessionManager(this);
+        if (session.isLoggedIn()) {
+            verifySessionOrShowLogin();
+            return;
+        }
 
         setContentView(R.layout.activity_login);
         edtUsername = findViewById(R.id.edtUsername);
@@ -62,17 +66,22 @@ public class LoginActivity extends AppCompatActivity {
                 if (js.has("data")) {
                     goHome(); // sesi valid
                 } else {
-                    session.clear();
-                    showLoginUiWithMsg("Sesi berakhir. Silakan login lagi.");
+                    JSONObject err = js.optJSONObject("error");
+                    int code = err != null ? err.optInt("code", 0) : 0;
+                    if (code == 401 || code == 403 || code == 409) {
+                        session.clear();
+                        showLoginUiWithMsg(err.optString("message","Sesi berakhir. Silakan login lagi."));
+                    } else {
+                        // bukan error sesi → jangan logout
+                        goHome();
+                    }
                 }
             } catch (Exception e) {
-                session.clear();
-                showLoginUiWithMsg("Sesi tidak valid. Silakan login lagi.");
+                goHome();
             }
         }, err -> {
             dlg.dismiss();
             Log.e("LOGIN", "verify error: " + err, err);
-            // Jika server unreachable tapi user ingin lanjut offline → boleh masuk
             goHome();
         }) {
             @Override protected Map<String, String> getParams() {
@@ -110,6 +119,12 @@ public class LoginActivity extends AppCompatActivity {
         StringRequest req = new StringRequest(Request.Method.POST, url, response -> {
             dlg.dismiss();
             try {
+                String trimmed = response == null ? "" : response.trim();
+                if (trimmed.isEmpty() || trimmed.charAt(0) == '<') {
+                    Toast.makeText(this, "Server mengirim respons tidak valid. Coba lagi.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
                 JSONObject js = new JSONObject(response);
                 if (js.has("data")) {
                     JSONObject d = js.getJSONObject("data");
@@ -138,6 +153,8 @@ public class LoginActivity extends AppCompatActivity {
             String msg = "Jaringan/Server error";
             if (error.networkResponse != null && error.networkResponse.data != null) {
                 msg = new String(error.networkResponse.data, StandardCharsets.UTF_8);
+                // kalau body HTML, jangan tampilkan mentah—ringkas:
+                if (msg.trim().startsWith("<")) msg = "Server error ("+error.networkResponse.statusCode+")";
             }
             Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
         }) {
